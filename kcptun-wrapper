@@ -1,0 +1,115 @@
+#!/bin/bash
+
+nextToken() {
+    result=
+    while true; do
+        offset=$((offset+1))
+        ch="${1:$offset:1}"
+        if [[ -z "$ch" ]]; then break; fi
+        if [[ "$ch" == "\\" ]]; then
+            offset=$((offset+1))
+            ch="${1:$offset:1}"
+            if [[ -z "$ch" ]]; then
+                echo "nothing following final escape in $1" >&2
+                exit 1
+            fi
+        else
+            case "$2" in *"$ch"*) break;; esac
+        fi
+        result="$result$ch"
+    done
+}
+
+setHosts() {
+    setAddr() {
+        local value="$3:$4"
+        case "$3" in "["*) ;; *":"*) value="[$3]:$4";; esac
+        if [[ "$1" -eq 0 ]]; then
+            key0="--$2"
+            value0="$value"
+        else
+            key1="--$2"
+            value1="$value"
+        fi
+    }
+    if [[ "$type" == 'client' ]]; then
+        setAddr 0 localaddr "${1:-127.0.0.1}" "${2:-12948}"
+        setAddr 1 remoteaddr "${3:-vps}" "${4:-29900}"
+    elif [[ "$type" == 'server' ]]; then
+        setAddr 0 listen "$3" "${4:-29900}"
+        setAddr 1 target "${1:-127.0.0.1}" "${2:-12948}"
+    elif [[ "$type" == 'udp2raw-client' ]]; then
+        setAddr 0 localaddr "${1:-127.0.0.1}" "${2:-12948}"
+        setAddr 1 remoteaddr "${1:-127.0.0.1}" "${2:-12948}"
+    elif [[ "$type" == 'udp2raw-server' ]]; then
+        setAddr 0 listen "$3" "${4:-29900}"
+        setAddr 1 target "$3" "${4:-29900}"
+    else
+        echo "Invalid type: $type" >&2
+        exit 1
+    fi
+}
+
+determine_type() {
+    local name=$(basename $0)
+    
+    if [[ "$name" == "kcptun-client-wrapper" ]] ; then
+        type=client
+        bin=$(type -p kcptun-client)
+    elif [[ "$name" == "kcptun-server-wrapper" ]]; then
+        type=server
+        bin=$(type -p kcptun-server)
+    elif [[ "$name" == "kcptun-udp2raw-client-wrapper" ]] ; then
+        type=udp2raw-client
+        bin=$(type -p kcptun-client)
+    elif [[ "$name" == "kcptun-udp2raw-server-wrapper" ]]; then
+        type=udp2raw-server
+        bin=$(type -p kcptun-server)
+    else
+        echo type must be either 'client' or 'server' >&2
+        exit 1
+    fi
+}
+
+execute() {
+    local opts="$SS_PLUGIN_OPTIONS"
+    if [[ -n "$opts" ]]; then
+        local len="$#"
+        offset=-1
+        while true; do
+            nextToken "$opts" "=;"
+            if [[ -z "$result" ]]; then
+                echo "empty key in $opts" >&2
+                exit 1
+            fi
+            set -- "$@" "--$result"
+            if [[ "$ch" == "=" ]]; then
+                nextToken "$opts" ";"
+                set -- "$@" "$result"
+            fi
+            if [[ -z "$ch" ]]; then break; fi
+        done
+
+        while [[ "$len" -gt 0 ]]; do
+            len=$((len-1))
+            set -- "$@" "$1"
+            shift
+        done
+    fi
+
+    determine_type
+
+    setHosts "$SS_LOCAL_HOST" "$SS_LOCAL_PORT" "$SS_REMOTE_HOST" "$SS_REMOTE_PORT"
+
+    if [[ "$type" == "udp2raw-client" ]]; then
+        sudo udp2raw -c -l "$SS_LOCAL_HOST:$SS_LOCAL_PORT" -r "$SS_REMOTE_HOST:$SS_REMOTE_PORT" --raw-mode faketcp -a &
+    elif [[ "$type" == "udp2raw-server" ]]; then
+        sudo udp2raw -s -l "$SS_LOCAL_HOST:$SS_LOCAL_PORT" -r "$SS_REMOTE_HOST:$SS_REMOTE_PORT" --raw-mode faketcp -a &
+    fi
+    
+    unset SS_LOCAL_HOST SS_LOCAL_PORT SS_REMOTE_HOST SS_REMOTE_PORT SS_PLUGIN_OPTIONS
+
+    exec "$bin" "$key0" "$value0" "$key1" "$value1" "$@"
+}
+
+execute "$@"
