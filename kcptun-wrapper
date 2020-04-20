@@ -1,6 +1,6 @@
 #!/bin/bash
 
-UDP2RAW_MODE='faketcp'
+UDP2RAW_MODE=
 
 udp2raw_pid=
 
@@ -104,6 +104,11 @@ execute() {
                 echo "empty key in $opts" >&2
                 exit 1
             fi
+            if [[ "$result" == "udp2raw_mode" ]]; then
+                nextToken "$opts" ";"
+                UDP2RAW_MODE="$result"
+            fi
+            if [[ -z "$ch" ]]; then break; fi
             set -- "$@" "--$result"
             if [[ "$ch" == "=" ]]; then
                 nextToken "$opts" ";"
@@ -122,6 +127,8 @@ execute() {
     determine_type
 
     setHosts "$SS_LOCAL_HOST" "$SS_LOCAL_PORT" "$SS_REMOTE_HOST" "$SS_REMOTE_PORT"
+
+    UDP2RAW_MODE=${UDP2RAW_MODE:-faketcp}
 
     if [[ "$type" == "udp2raw-client" ]]; then
         sudo udp2raw -c -l "$SS_LOCAL_HOST:$SS_LOCAL_PORT" -r "$SS_REMOTE_HOST:$SS_REMOTE_PORT" --raw-mode $UDP2RAW_MODE -a &
