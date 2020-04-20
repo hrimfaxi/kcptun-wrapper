@@ -133,7 +133,12 @@ execute() {
     if [[ "$type" == "udp2raw-client" ]]; then
         sudo udp2raw -c -l "$SS_LOCAL_HOST:$SS_LOCAL_PORT" -r "$SS_REMOTE_HOST:$SS_REMOTE_PORT" --raw-mode $UDP2RAW_MODE -a &
     elif [[ "$type" == "udp2raw-server" ]]; then
-        sudo udp2raw -s -l "$SS_REMOTE_HOST:$SS_REMOTE_PORT" -r "$SS_LOCAL_HOST:$SS_REMOTE_PORT" --raw-mode $UDP2RAW_MODE -a &
+        if [[ $UDP2RAW_MODE == "icmp" ]]; then
+            remote_port=60001
+        else
+            remote_port=$SS_REMOTE_PORT
+        fi
+        sudo udp2raw -s -l "$SS_REMOTE_HOST:$remote_port" -r "$SS_LOCAL_HOST:$SS_REMOTE_PORT" --raw-mode $UDP2RAW_MODE -a &
     fi
     udp2raw_pid=$!
     if [[ -z "$udp2raw_pid" ]]; then
