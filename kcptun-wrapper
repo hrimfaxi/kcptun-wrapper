@@ -1,6 +1,7 @@
 #!/bin/bash
 
 UDP2RAW_MODE=
+UDP2RAW_KEY=
 
 udp2raw_pid=
 
@@ -107,6 +108,13 @@ execute() {
             if [[ "$result" == "udp2raw_mode" ]]; then
                 nextToken "$opts" ";"
                 UDP2RAW_MODE="$result"
+                nextToken "$opts" "=;"
+            fi
+            if [[ -z "$ch" ]]; then break; fi
+            if [[ "$result" == "udp2raw_key" ]]; then
+                nextToken "$opts" ";"
+                UDP2RAW_KEY="$result"
+                nextToken "$opts" "=;"
             fi
             if [[ -z "$ch" ]]; then break; fi
             set -- "$@" "--$result"
