@@ -17,7 +17,7 @@ func_trap() {
         KCPTUN_PID=
     fi
     if [[ -n "$UDP2RAW_PID" ]]; then
-        PIDS=$(pgrep -P "$UDP2RAW_PID")
+        PIDS=$(ps h --ppid "$UDP2RAW_PID" -o pid)
         # echo PID: $PIDS UDP2RAW_PID: $UDP2RAW_PID
         echo sudo kill -s "$signal" $PIDS
         sudo kill -s "$signal" "$PIDS"
