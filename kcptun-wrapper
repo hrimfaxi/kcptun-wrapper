@@ -31,7 +31,6 @@ trap_with_arg() {
     func="$1"
     shift
     for sig ; do
-        echo trap "$func $sig" "$sig"
         trap "$func $sig" "$sig"
     done
 }
