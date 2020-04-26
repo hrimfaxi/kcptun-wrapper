@@ -10,6 +10,7 @@ func_trap() {
     # we can't kill background child process with signal INT
     if [[ "$signal" == INT ]]; then signal=TERM; fi
     if [[ -n "$udp2raw_pid" ]]; then
+        echo sudo kill -s "$signal" "$udp2raw_pid"
         sudo kill -s "$signal" "$udp2raw_pid" || true
     fi
 }
