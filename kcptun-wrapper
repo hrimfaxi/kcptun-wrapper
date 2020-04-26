@@ -3,15 +3,26 @@
 UDP2RAW_MODE=
 UDP2RAW_KEY=
 
-udp2raw_pid=
+UDP2RAW_PID=
+KCPTUN_PID=
 
 func_trap() {
     local signal="$1"
     # we can't kill background child process with signal INT
     if [[ "$signal" == INT ]]; then signal=TERM; fi
-    if [[ -n "$udp2raw_pid" ]]; then
-        echo sudo kill -s "$signal" "$udp2raw_pid"
-        sudo kill -s "$signal" "$udp2raw_pid" || true
+    if [[ "$signal" == EXIT ]]; then signal=TERM; fi
+    if [[ -n "$KCPTUN_PID" ]]; then
+        echo sudo kill -s "$signal" "$KCPTUN_PID"
+        sudo kill -s "$signal" "$KCPTUN_PID"
+        KCPTUN_PID=
+    fi
+    if [[ -n "$UDP2RAW_PID" ]]; then
+        PIDS=$(pgrep -P "$UDP2RAW_PID")
+        # echo PID: $PIDS UDP2RAW_PID: $UDP2RAW_PID
+        echo sudo kill -s "$signal" $PIDS
+        sudo kill -s "$signal" "$PIDS"
+        sudo kill -s "$signal" "$UDP2RAW_PID" 2> /dev/null
+        UDP2RAW_PID=
     fi
 }
 
@@ -20,6 +31,7 @@ trap_with_arg() {
     func="$1"
     shift
     for sig ; do
+        echo trap "$func $sig" "$sig"
         trap "$func $sig" "$sig"
     done
 }
@@ -150,19 +162,37 @@ execute() {
         fi
         sudo udp2raw -s -l "$SS_REMOTE_HOST:$remote_port" -r "$SS_LOCAL_HOST:$SS_REMOTE_PORT" --raw-mode $UDP2RAW_MODE -a &
     fi
-    udp2raw_pid=$!
-    if [[ -z "$udp2raw_pid" ]]; then
+    UDP2RAW_PID=$!
+    if [[ -z "$UDP2RAW_PID" ]]; then
         echo Unknown error occur, cannot get process id of child process. >&2
         exit 1
     fi
     # When we quit, we go with udp2raw
-    trap_with_arg func_trap HUP INT QUIT ILL TRAP ABRT BUS FPE USR1 SEGV USR2 PIPE ALRM TERM
+    trap_with_arg func_trap HUP INT QUIT ILL TRAP ABRT BUS FPE USR1 SEGV USR2 PIPE ALRM TERM EXIT
     
     unset SS_LOCAL_HOST SS_LOCAL_PORT SS_REMOTE_HOST SS_REMOTE_PORT SS_PLUGIN_OPTIONS
 
     echo "$bin" "$key0" "$value0" "$key1" "$value1" "$@"
-    "$bin" "$key0" "$value0" "$key1" "$value1" "$@"
-    exit $?
+    "$bin" "$key0" "$value0" "$key1" "$value1" "$@" &
+    KCPTUN_PID=$!
+    if [[ -z "$KCPTUN_PID" ]]; then
+        echo Unknown error occur, cannot get process id of child process. >&2
+        exit 1
+    fi
+
+    while true; do
+        local value=0
+        wait "$KCPTUN_PID" 2>/dev/null || value=$?
+        # 127 means this pid is not child process of our shell.
+        if [[ "$value" == 127 ]]; then break; fi
+        wait_result="$value"
+        if [[ "$value" == 0 ]]; then break; fi
+        # yield control of the CPU
+        sleep 0.1 || sleep 1
+        if ! kill -0 "$KCPTUN_PID" 2>/dev/null; then break; fi
+    done
+    KCPTUN_PID=
+    return $wait_result
 }
 
 sudo true
