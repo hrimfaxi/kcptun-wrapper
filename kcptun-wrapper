@@ -2,8 +2,9 @@
 
 UDP2RAW_MODE=
 UDP2RAW_KEY=
-
+UDP2RAW_CIPHER_MODE=
 UDP2RAW_PID=
+
 KCPTUN_PID=
 
 func_trap() {
@@ -130,6 +131,12 @@ execute() {
                 nextToken "$opts" "=;"
             fi
             if [[ -z "$ch" ]]; then break; fi
+            if [[ "$result" == "udp2raw_cipher_mode" ]]; then
+                nextToken "$opts" ";"
+                UDP2RAW_CIPHER_MODE="$result"
+                nextToken "$opts" "=;"
+            fi
+            if [[ -z "$ch" ]]; then break; fi
             set -- "$@" "--$result"
             if [[ "$ch" == "=" ]]; then
                 nextToken "$opts" ";"
@@ -150,16 +157,18 @@ execute() {
     setHosts "$SS_LOCAL_HOST" "$SS_LOCAL_PORT" "$SS_REMOTE_HOST" "$SS_REMOTE_PORT"
 
     UDP2RAW_MODE=${UDP2RAW_MODE:-faketcp}
+    UDP2RAW_CIPHER_MODE=${UDP2RAW_CIPHER_MODE:-aes128cbc}
+    UDP2RAW_KEY="${UDP2RAW_KEY:-secret key}"
 
     if [[ "$type" == "udp2raw-client" ]]; then
-        sudo udp2raw -c -l "$SS_LOCAL_HOST:$SS_LOCAL_PORT" -r "$SS_REMOTE_HOST:$SS_REMOTE_PORT" --raw-mode $UDP2RAW_MODE -a &
+        sudo udp2raw -c -l "$SS_LOCAL_HOST:$SS_LOCAL_PORT" -r "$SS_REMOTE_HOST:$SS_REMOTE_PORT" --raw-mode $UDP2RAW_MODE --cipher-mode $UDP2RAW_CIPHER_MODE -k $UDP2RAW_KEY -a &
     elif [[ "$type" == "udp2raw-server" ]]; then
         if [[ $UDP2RAW_MODE == "icmp" ]]; then
             remote_port=60001
         else
             remote_port=$SS_REMOTE_PORT
         fi
-        sudo udp2raw -s -l "$SS_REMOTE_HOST:$remote_port" -r "$SS_LOCAL_HOST:$SS_REMOTE_PORT" --raw-mode $UDP2RAW_MODE -a &
+        sudo udp2raw -s -l "$SS_REMOTE_HOST:$remote_port" -r "$SS_LOCAL_HOST:$SS_REMOTE_PORT" --raw-mode $UDP2RAW_MODE --cipher-mode $UDP2RAW_CIPHER_MODE -k $UDP2RAW_KEY -a &
     fi
     UDP2RAW_PID=$!
     if [[ -z "$UDP2RAW_PID" ]]; then
