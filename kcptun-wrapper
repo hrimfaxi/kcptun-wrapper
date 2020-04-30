@@ -122,19 +122,17 @@ execute() {
             if [[ "$result" == "udp2raw_mode" ]]; then
                 nextToken "$opts" ";"
                 UDP2RAW_MODE="$result"
-                nextToken "$opts" "=;"
+                continue
             fi
-            if [[ -z "$ch" ]]; then break; fi
             if [[ "$result" == "udp2raw_key" ]]; then
                 nextToken "$opts" ";"
                 UDP2RAW_KEY="$result"
-                nextToken "$opts" "=;"
+                continue
             fi
-            if [[ -z "$ch" ]]; then break; fi
             if [[ "$result" == "udp2raw_cipher_mode" ]]; then
                 nextToken "$opts" ";"
                 UDP2RAW_CIPHER_MODE="$result"
-                nextToken "$opts" "=;"
+                continue
             fi
             if [[ -z "$ch" ]]; then break; fi
             set -- "$@" "--$result"
